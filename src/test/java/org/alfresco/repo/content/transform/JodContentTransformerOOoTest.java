@@ -29,6 +29,7 @@ import static org.junit.Assert.assertNotNull;
 
 import org.alfresco.repo.content.AbstractJodConverterBasedTest;
 import org.alfresco.model.ContentModel;
+import org.alfresco.repo.content.MimetypeMap;
 import org.alfresco.repo.thumbnail.ThumbnailDefinition;
 import org.alfresco.repo.thumbnail.ThumbnailRegistry;
 import org.alfresco.repo.transaction.RetryingTransactionHelper.RetryingTransactionCallback;
@@ -73,11 +74,16 @@ public class JodContentTransformerOOoTest extends AbstractJodConverterBasedTest
                     	{
                     		log.debug("Testing thumbnail definition " + thumbDef.getName());
                     	}
-                    	
-                        NodeRef thumbnail = thumbnailService.createThumbnail(contentNodeRef, ContentModel.PROP_CONTENT,
-							        thumbDef.getMimetype(), thumbDef.getTransformationOptions(), thumbDef.getName());
-                        
-                        assertNotNull("Thumbnail was unexpectedly null.", thumbnail);
+
+                    	// We no longer thumbnail to FLASH and the transform has been removed, so lets not test it any more.
+                        // Note: this test does not run on Bamboo as LibreOffice is not installed so we have not seen the failure.
+                    	if (!MimetypeMap.MIMETYPE_FLASH.equals(thumbDef.getMimetype()))
+                        {
+                            NodeRef thumbnail = thumbnailService.createThumbnail(contentNodeRef, ContentModel.PROP_CONTENT,
+                                thumbDef.getMimetype(), thumbDef.getTransformationOptions(), thumbDef.getName());
+
+                            assertNotNull("Thumbnail was unexpectedly null.", thumbnail);
+                        }
                     }
                     
                     return null;

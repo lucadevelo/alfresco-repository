@@ -32,9 +32,12 @@ import org.alfresco.repo.content.MimetypeMap;
 import org.alfresco.repo.content.filestore.FileContentReader;
 import org.alfresco.repo.content.filestore.FileContentWriter;
 import org.alfresco.service.cmr.repository.ContentReader;
+import org.alfresco.service.cmr.repository.ContentService;
 import org.alfresco.service.cmr.repository.ContentWriter;
 import org.alfresco.service.cmr.repository.TransformationOptions;
 import org.alfresco.util.TempFileProvider;
+import org.apache.log4j.Level;
+import org.apache.log4j.Logger;
 
 /**
  * We no longer use ooo.direct in Community. This test class now is connnected up to the JODConverter which was moved
@@ -48,7 +51,11 @@ public class OpenOfficeContentTransformerTest extends AbstractContentTransformer
     
     private ContentTransformerWorker worker;
     private ProxyContentTransformer transformer;
+    private ContentService contentService;
     
+    Logger transformerDebugLogger;
+    Level origTransformerDebugLoggerLevel;
+
     @Override
     public void setUp() throws Exception
     {
@@ -60,8 +67,22 @@ public class OpenOfficeContentTransformerTest extends AbstractContentTransformer
         transformer.setTransformerDebug(transformerDebug);
         transformer.setTransformerConfig(transformerConfig);
         transformer.setWorker(this.worker);
+
+        contentService = (ContentService) ctx.getBean("contentService");
+
+        transformerDebugLogger = Logger.getLogger(TransformerDebug.class);
+        origTransformerDebugLoggerLevel = transformerDebugLogger.getLevel();
+        transformerDebugLogger.setLevel(Level.DEBUG);
     }
-    
+
+    @Override
+    protected void tearDown() throws Exception
+    {
+        super.tearDown();
+
+        transformerDebugLogger.setLevel(origTransformerDebugLoggerLevel);
+    }
+
     /**
      * @return Returns the same transformer regardless - it is allowed
      */
@@ -113,10 +134,90 @@ public class OpenOfficeContentTransformerTest extends AbstractContentTransformer
         reader.setMimetype(MimetypeMap.MIMETYPE_HTML);
         ContentWriter writer = new FileContentWriter(pdfTargetFile);
         writer.setMimetype(MimetypeMap.MIMETYPE_PDF);
-        
-        transformer.transform(reader, writer);
     }
     
+    /**
+     * Test what is up with HTML to PDF again in 6.0 REPO-3033
+     * In this case we use the full set of transformers as we would in a live system.
+     */
+    public void testHtmlToPdfRepo3033() throws Exception
+    {
+        // Before fixing the problem this test failed just like the live system with the following output.
+
+        // The source html file is passed to a JodConverter to turn it into an odt file.
+        // This should then be converted to pdf by a second JodConverter.
+
+        // The second conversion fails when AbstractConversionTask (in the alfresco-jodconverter-core-3.0.1
+        // execute method calls loadDocument(context, inputFile) as the soffice crashes and is restarted.
+
+        // This may be related to the fact that we have given the file an odt extension and where
+
+        // The intermediate mimetype is application/vnd.oasis.opendocument.text-web and we have given it an odt
+        // extension. The mimetype of odt does not normally have -web on the end.
+
+
+        // jurt 3.2.1
+
+        // 2017-12-08 16:41:45,319  DEBUG [content.transform.TransformerDebug] [main] 1             html pdf  1.6 KB JodConverter.Html2Pdf<<Complex>>
+        // 2017-12-08 16:41:45,319  DEBUG [content.transform.TransformerDebug] [main] 1
+        // 2017-12-08 16:41:45,370  DEBUG [content.transform.TransformerDebug] [main] 1.1           html odt  <<TemporaryFile>> 1.6 KB JodConverter<<Proxy>>
+        // 2017-12-08 16:41:46,408  DEBUG [content.transform.TransformerDebug] [main] 1.2           odt  pdf  <<TemporaryFile>> 7.8 KB JodConverter<<Proxy>>
+        //Dec 08, 2017 4:41:56 PM org.artofsolving.jodconverter.office.OfficeConnection$1 disposing
+        //INFO: disconnected: 'socket,host=127.0.0.1,port=8100,tcpNoDelay=1'
+        //Dec 08, 2017 4:41:56 PM org.artofsolving.jodconverter.office.PooledOfficeManager$1 disconnected
+        //WARNING: connection lost unexpectedly; attempting restart
+        //Dec 08, 2017 4:41:56 PM org.artofsolving.jodconverter.office.ManagedOfficeProcess doEnsureProcessExited
+        //INFO: process exited with code 0
+        // 2017-12-08 16:41:56,668  DEBUG [content.transform.TransformerDebug] [main] 1.2                     Failed: Mime type was 'application/vnd.oasis.opendocument.text-web' 11080018 OpenOffice server conversion failed
+        // 2017-12-08 16:41:56,670  DEBUG [content.transform.TransformerDebug] [main] 1.2                     Failed 11080018 OpenOffice server conversion failed
+        // 2017-12-08 16:41:56,680  DEBUG [content.transform.TransformerDebug] [main] 1                       Failed 11080019 Content conversion failed
+        // 2017-12-08 16:41:56,682  DEBUG [content.transform.TransformerDebug] [main] 1             Finished in 11,362 ms
+        //
+        //org.alfresco.service.cmr.repository.ContentIOException: 11080020 Content conversion failed:
+        //   reader: ContentAccessor[ contentUrl=store://C:\noscan\bat1\alfresco-repository\target\classes\quick\repo3033.html, mimetype=text/html, size=1689, encoding=UTF-8, locale=en_GB]
+        //   writer: ContentAccessor[ contentUrl=store://C:\Users\adavis\AppData\Local\Temp\Alfresco\testHtmlToPdfRepo3033-target-3408472472346063367.pdf, mimetype=application/pdf, size=0, encoding=UTF-8, locale=en_GB]
+        //   options: {use=null, contentReaderNodeRef=null, sourceContentProperty=null, contentWriterNodeRef=null, targetContentProperty=null, includeEmbedded=null}
+        //   limits: {timeoutMs=120000}
+        //
+        //	at org.alfresco.repo.content.transform.AbstractContentTransformer2.transform(AbstractContentTransformer2.java:354)
+        //	at org.alfresco.repo.content.transform.OpenOfficeContentTransformerTest.testHtmlToPdfRepo3033(OpenOfficeContentTransformerTest.java:161)
+        //  ...
+        //Caused by: org.alfresco.service.cmr.repository.ContentIOException: 11080019 Content conversion failed:
+        //   reader: ContentAccessor[ contentUrl=store://C:\Users\adavis\AppData\Local\Temp\Alfresco\ComplextTransformer_intermediate_html_6778438399165479185.odt, mimetype=application/vnd.oasis.opendocument.text-web, size=8061, encoding=UTF-8, locale=en_GB]
+        //   writer: ContentAccessor[ contentUrl=store://C:\Users\adavis\AppData\Local\Temp\Alfresco\testHtmlToPdfRepo3033-target-3408472472346063367.pdf, mimetype=application/pdf, size=0, encoding=UTF-8, locale=en_GB]
+        //   options: {use=null, contentReaderNodeRef=null, sourceContentProperty=null, contentWriterNodeRef=null, targetContentProperty=null, includeEmbedded=null}
+        //   limits: {timeoutMs=120000}
+        //   claimed mime type: application/vnd.oasis.opendocument.text-web
+        //   detected mime type: application/vnd.oasis.opendocument.text-web
+        //   transformer not found
+        //
+        //	at org.alfresco.repo.content.transform.AbstractContentTransformer2.transform(AbstractContentTransformer2.java:385)
+        //	at org.alfresco.repo.content.transform.ComplexContentTransformer.transformInternal(ComplexContentTransformer.java:492)
+        //	at org.alfresco.repo.content.transform.AbstractContentTransformer2.transform(AbstractContentTransformer2.java:272)
+        //	... 19 more
+
+        if (!isOpenOfficeWorkerAvailable())
+        {
+            // no connection
+            System.err.println("ooWorker not available - skipping testHtmlToPdf !!");
+            return;
+        }
+
+        File htmlSourceFile = loadNamedQuickTestFile("repo3033.html");
+        File pdfTargetFile = TempFileProvider.createTempFile(getName() + "-target-", ".pdf");
+        ContentReader reader = new FileContentReader(htmlSourceFile);
+        reader.setMimetype(MimetypeMap.MIMETYPE_HTML);
+        ContentWriter writer = new FileContentWriter(pdfTargetFile);
+        writer.setMimetype(MimetypeMap.MIMETYPE_PDF);
+
+        ContentTransformer contentTransformer = contentService.getTransformer(MimetypeMap.MIMETYPE_HTML, MimetypeMap.MIMETYPE_PDF);
+
+        assertEquals("transformer.JodConverter.Html2Pdf", contentTransformer.getName());
+
+        TransformationOptions options = new TransformationOptions();
+        contentTransformer.transform(reader, writer, options);
+    }
+
     /**
      * ALF-219. Transforamtion from .html to .pdf for empty file.
      * @throws Exception
