@@ -100,14 +100,6 @@ public class DbNodeServiceImplTest extends BaseNodeServiceTest
         dictionaryService = (DictionaryService) applicationContext.getBean("dictionaryService");
     }
 
-    // REPO-2963 Initially just pass tests on selected DBs
-    protected boolean skipTestRepo2963()
-    {
-        return true; // Always skip the test
-//        String name = dialect.getClass().getName();
-//        return name.contains("PostgreSQL") || name.contains("MySQL");
-    }
-
     /**
      * Ensure that transactionless calls are handled
      */
@@ -124,12 +116,6 @@ public class DbNodeServiceImplTest extends BaseNodeServiceTest
      */
     public void testNodeCleanupRegistry() throws Exception
     {
-        // See REPO-2963
-        if (skipTestRepo2963())
-        {
-            return;
-        }
-
         setComplete();
         endTransaction();
         NodeCleanupRegistry cleanupRegistry = (NodeCleanupRegistry) applicationContext.getBean("nodeCleanupRegistry");
@@ -141,12 +127,6 @@ public class DbNodeServiceImplTest extends BaseNodeServiceTest
      */
     public synchronized void testTxnCommitTime() throws Exception
     {
-        // See REPO-2963
-        if (skipTestRepo2963())
-        {
-            return;
-        }
-
         /*
          * This test is subject to intermittent - but correct - failures if bug ALF-14929 is present
          */
