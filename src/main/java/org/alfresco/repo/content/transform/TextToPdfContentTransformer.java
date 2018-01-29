@@ -26,6 +26,7 @@
 package org.alfresco.repo.content.transform;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -33,6 +34,7 @@ import java.io.OutputStream;
 import java.io.Reader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.alfresco.error.AlfrescoRuntimeException;
@@ -45,10 +47,10 @@ import org.alfresco.service.cmr.repository.TransformationOptionPair.Action;
 import org.alfresco.service.cmr.repository.TransformationOptions;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.pdfbox.TextToPDF;
+import org.apache.pdfbox.tools.TextToPDF;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.edit.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDTrueTypeFont;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 /**
@@ -60,7 +62,27 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 public class TextToPdfContentTransformer extends AbstractContentTransformer2
 {
     private static final Log logger = LogFactory.getLog(TextToPdfContentTransformer.class);
-    
+
+    // Taken from pdfbox's TextToPDF, but is private
+    private static final Map<String, PDType1Font> STANDARD_14 = new HashMap<String, PDType1Font>();
+    static
+    {
+        STANDARD_14.put(PDType1Font.TIMES_ROMAN.getBaseFont(), PDType1Font.TIMES_ROMAN);
+        STANDARD_14.put(PDType1Font.TIMES_BOLD.getBaseFont(), PDType1Font.TIMES_BOLD);
+        STANDARD_14.put(PDType1Font.TIMES_ITALIC.getBaseFont(), PDType1Font.TIMES_ITALIC);
+        STANDARD_14.put(PDType1Font.TIMES_BOLD_ITALIC.getBaseFont(), PDType1Font.TIMES_BOLD_ITALIC);
+        STANDARD_14.put(PDType1Font.HELVETICA.getBaseFont(), PDType1Font.HELVETICA);
+        STANDARD_14.put(PDType1Font.HELVETICA_BOLD.getBaseFont(), PDType1Font.HELVETICA_BOLD);
+        STANDARD_14.put(PDType1Font.HELVETICA_OBLIQUE.getBaseFont(), PDType1Font.HELVETICA_OBLIQUE);
+        STANDARD_14.put(PDType1Font.HELVETICA_BOLD_OBLIQUE.getBaseFont(), PDType1Font.HELVETICA_BOLD_OBLIQUE);
+        STANDARD_14.put(PDType1Font.COURIER.getBaseFont(), PDType1Font.COURIER);
+        STANDARD_14.put(PDType1Font.COURIER_BOLD.getBaseFont(), PDType1Font.COURIER_BOLD);
+        STANDARD_14.put(PDType1Font.COURIER_OBLIQUE.getBaseFont(), PDType1Font.COURIER_OBLIQUE);
+        STANDARD_14.put(PDType1Font.COURIER_BOLD_OBLIQUE.getBaseFont(), PDType1Font.COURIER_BOLD_OBLIQUE);
+        STANDARD_14.put(PDType1Font.SYMBOL.getBaseFont(), PDType1Font.SYMBOL);
+        STANDARD_14.put(PDType1Font.ZAPF_DINGBATS.getBaseFont(), PDType1Font.ZAPF_DINGBATS);
+    }
+
     private PagedTextToPDF transformer;
     
     public TextToPdfContentTransformer()
@@ -73,7 +95,7 @@ public class TextToPdfContentTransformer extends AbstractContentTransformer2
     {
         try
         {
-            transformer.setFont(PDType1Font.getStandardFont(fontName));
+            transformer.setFont(STANDARD_14.get(fontName));
         }
         catch (Throwable e)
         {
@@ -85,7 +107,7 @@ public class TextToPdfContentTransformer extends AbstractContentTransformer2
     {
         try
         {
-            transformer.setFont(PDTrueTypeFont.loadTTF(null, fontName));
+            transformer.setFont(org.apache.pdfbox.pdmodel.font.PDType0Font.load(null, new File(fontName)));
         }
         catch (Throwable e)
         {
